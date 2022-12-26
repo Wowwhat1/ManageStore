@@ -12,7 +12,7 @@ import java.beans.PropertyChangeListener;
 import java.io.*;
 import java.util.ArrayList;
 
-public class MsController implements Action, Serializable {
+public class MsController implements Action {
     public ManageForm view;
 
     public MsController(ManageForm view) {
@@ -26,9 +26,27 @@ public class MsController implements Action, Serializable {
             case "ADD" -> {
                 this.view.model.setChoices("ADD");
                 int optionPanel = JOptionPane.showConfirmDialog(view, "Are you sure you want to save this product?", "Confirm Save", JOptionPane.YES_NO_CANCEL_OPTION);
+                int catId = this.view.catComboBox.getSelectedIndex();
+                String name = this.view.txtName.getText();
+                Category cat = Category.getCatById(catId);
+                String origin = this.view.txtOrigin.getText();
                 if (optionPanel == 0) {
                     try {
-                        this.addItem();
+                        double price = Double.parseDouble(this.view.txtPrice.getText());
+                        int quantity = Integer.parseInt(this.view.txtQuantity.getText());
+                        String id = this.view.txtId.getText();
+                        if (isDuplicate(id)) {
+                            JOptionPane.showMessageDialog(this.view, "ID is duplicate, please enter another ID!");
+                        } else
+//                            if (isDuplicate(name, cat, origin)) {
+//                            updatedPriceQuantity(price, quantity);
+//                            JOptionPane.showMessageDialog(this.view, "It's already exist an item like this, it will be combine together!");
+//                            this.delForm();
+//                        } else
+                        {
+                            this.addItem();
+                            this.delForm();
+                        }
                     } catch (NumberFormatException ea) {
                         JOptionPane.showMessageDialog(this.view, "Input mismatch exception, make sure that price and quantity are number!");
                     }
@@ -42,22 +60,28 @@ public class MsController implements Action, Serializable {
                 }
             }
             case "SAVE" -> {
-                try {
+//                try {
                     int optionPanel = JOptionPane.showConfirmDialog(view, "Are you sure you want to save this product?", "Confirm Save", JOptionPane.YES_NO_CANCEL_OPTION);
                     if (optionPanel == 0) {
-                        this.addItem();
-                        this.delForm();
+                            this.addItem();
+                            this.delForm();
                     }
-                } catch (Exception e2) {
-                    e2.printStackTrace();
+//                } catch (NumberFormatException e2) {
+//                    JOptionPane.showMessageDialog(this.view, "Please enter integer number in Price field");
+//                }
+            }
+            case "REMOVE" -> {
+                try {
+                    this.delItem();
+                } catch (ArrayIndexOutOfBoundsException e3) {
+                    JOptionPane.showMessageDialog(this.view, "You are not select any item yet, please choose an item!");
                 }
             }
-            case "REMOVE" -> this.delItem();
             case "Filter" -> this.searchButton();
             case "Back" -> this.clearSearchButton();
             case "More" -> this.showMore();
             case "Open" -> this.openFile();
-            case "Save" -> this.saveFile();
+            case "Save File" -> this.saveFile();
         }
     }
 
@@ -116,23 +140,22 @@ public class MsController implements Action, Serializable {
         int catId = this.view.catComboBox.getSelectedIndex();
         cat = Category.getCatById(catId);
         origin = this.view.txtOrigin.getText();
-        price = Double.parseDouble(this.view.txtPrice.getText());
-        quantity = Integer.parseInt(this.view.txtQuantity.getText());
+        try {
+            price = Double.parseDouble(this.view.txtPrice.getText());
+            quantity = Integer.parseInt(this.view.txtQuantity.getText());
         status = this.view.txtStatus.getText();
         if (this.containsNumberOrSpecialChar(name)) {
             JOptionPane.showMessageDialog(this.view, "Field name must contains only character!");
         } else if (name == null || name.equals("Name")|| id == null || id.equals("ID")|| cat.getName().equals("") || origin == null || origin.equals("Origin")
                 || this.view.txtPrice.getText().equals("Price") || quantity == 0 || this.view.txtQuantity.getText().equals("Quantity")) {
             JOptionPane.showMessageDialog(this.view, "Please fulfill the form!");
-        } else if (isDuplicate(id)) {
-            JOptionPane.showMessageDialog(this.view, "ID is duplicate, please enter another ID!");
-        } else if (isDuplicate(name, cat, origin)) {
-            updatedPriceQuantity(price, quantity);
-            JOptionPane.showMessageDialog(this.view, "It's already exist an item like this, it will be combine together!");
         } else {
             Item item = new Item(name, id, cat, origin, price, quantity, status);
             this.addOrUptItem(item);
             this.delForm();
+        }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this.view, "Please enter correct format of number (double for price field and integer for quantity field)!");
         }
     }
 
@@ -207,15 +230,16 @@ public class MsController implements Action, Serializable {
     public void searchButton() {
         int catIndex = this.view.catFilComboBox.getSelectedIndex();
         Category cat = Category.getCatById(catIndex);
-        RowFilter<DefaultTableModel, Object> rf = RowFilter.regexFilter(cat.getName(), 0);
+        RowFilter<DefaultTableModel, Object> rf = RowFilter.regexFilter(cat.getName(), 2);
         DefaultTableModel model_table = (DefaultTableModel) this.view.table.getModel();
         TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model_table);
         sorter.setRowFilter(rf);
         view.table.setRowSorter(sorter);
     }
     public void clearSearchButton() {
-        String search = "";
-        RowFilter<DefaultTableModel, Object> rf = RowFilter.regexFilter(search, 0);
+        Category cat = Category.getCatById(0);
+        RowFilter<DefaultTableModel, Object> rf = RowFilter.regexFilter(cat.getName(), 2);
+        this.view.catFilComboBox.setSelectedIndex(0);
         DefaultTableModel model_table;
         model_table = (DefaultTableModel) view.table.getModel();
         TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model_table);
@@ -243,13 +267,21 @@ public class MsController implements Action, Serializable {
             FileInputStream fis = new FileInputStream(file);
             ObjectInputStream ois = new ObjectInputStream(fis);
             Item item;
-            while((item = (Item) ois.readObject())!=null) {
+            while(ois.readObject() != null) {
+                try {
+                    item = (Item) ois.readObject();
                     ds.add(item);
+                    System.out.println(item);
+                } catch (EOFException e) {
+                    break;
+                }
             }
             ois.close();
             fis.close();
+        } catch (StreamCorruptedException e) {
+            JOptionPane.showMessageDialog(this.view, "Incorrect file format!");
         } catch (Exception e) {
-            e.printStackTrace();
+            JOptionPane.showMessageDialog(this.view, e.getMessage());
         }
         this.view.model.setItemList(ds);
     }
@@ -276,7 +308,7 @@ public class MsController implements Action, Serializable {
             saveFile(this.view.model.getFileName());
         } else {
             JFileChooser fc = new JFileChooser();
-            int returnVal = fc.showSaveDialog(view);
+            int returnVal = fc.showSaveDialog(this.view);
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = fc.getSelectedFile();
                 saveFile(file.getAbsolutePath());
@@ -290,6 +322,7 @@ public class MsController implements Action, Serializable {
             ObjectOutputStream oos = new ObjectOutputStream(fos);
             for (Item item : this.view.model.getItemList()) {
                 oos.writeObject(item);
+                System.out.println(item);
             }
             oos.close();
             JOptionPane.showMessageDialog(null, "Save successful", "Save!", JOptionPane.INFORMATION_MESSAGE);

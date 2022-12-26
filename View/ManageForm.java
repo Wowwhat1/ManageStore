@@ -67,7 +67,7 @@ public class ManageForm extends JFrame {
         openMenu.addActionListener(action);
         fileMenu.add(openMenu);
 
-        JMenuItem saveMenu = new JMenuItem("Save");
+        JMenuItem saveMenu = new JMenuItem("Save File");
         saveMenu.addActionListener(action);
         fileMenu.add(saveMenu);
 
